@@ -136,3 +136,91 @@ knn_eval = {
         'f1': f1_score(y_test, y_pred)
     }
 print(knn_eval)
+
+KNN
+streams_3Q = df['streams'].quantile(0.75)
+df['HighStreams'] = np.where(df['streams'] > streams_3Q, 'Yes', 'No')
+df['HighStreams'] = df['HighStreams'].map({'Yes': 1, 'No': 0})
+df.drop(columns='streams', inplace=True)
+print(df.isna().sum())
+p_spotify = shapiro(df['in_spotify_charts'].dropna())[1]
+p_apple = shapiro(df['in_apple_charts'].dropna())[1]
+df['in_spotify_charts'] = df['in_spotify_charts'].fillna(median_spotify)
+df['in_apple_charts'] = df['in_apple_charts'].fillna(median_apple)
+df.drop(columns='track_name', inplace=True)
+sns.kdeplot(data=df, x='released_year', hue='HighStreams') #seaborn sb sns
+plt.show()
+numeric_vars = ['released_year', 'in_spotify_playlists', 'in_spotify_charts', 'in_apple_playlists', 'in_apple_charts']
+def count_outliers(variable):
+    q1 = variable.quantile(0.25)
+    q3 = variable.quantile(0.75)
+    iqr = q3 - q1
+    lower = q1 - 1.5 * iqr
+    upper = q3 + 1.5 * iqr
+    return ((variable < lower) | (variable > upper)).sum()
+outliers_per_column = df[numeric_vars].apply(count_outliers)
+print("Broj autlajera po kolonama:\n", outliers_per_column)
+shapiro_results = df[numeric_vars].apply(lambda x: shapiro(x)[1])
+print("Shapiro-Wilk p-vrednosti:\n", shapiro_results)
+robust_scaler = RobustScaler()
+df_st = pd.DataFrame()
+df_st[numeric_vars] = robust_scaler.fit_transform(df[numeric_vars])
+print(df['mode'].unique())
+df_st['mode'] = df['mode'].map({'Major': 0, 'Minor': 1})
+df_st['HighStreams'] = df['HighStreams']
+knn = KNeighborsClassifier()
+param_grid = {'n_neighbors': list(range(3, 26, 2))}
+cv = GridSearchCV(estimator=knn,
+                  param_grid=param_grid,
+                  cv=10)
+cv.fit(X_train, y_train)
+
+best_k = cv.best_params_['n_neighbors']
+print("Optimalna vrednost za k:", best_k)
+
+knn = KNeighborsClassifier(n_neighbors=best_k)
+knn.fit(X_train, y_train)
+y_pred = knn.predict(X_test)
+cm_knn = confusion_matrix(y_test, y_pred)
+print(cm_knn)
+knn_eval = {
+        'accuracy': accuracy_score(y_test, y_pred),
+        'precision': precision_score(y_test, y_pred),
+        'recall': recall_score(y_test, y_pred),
+        'f1': f1_score(y_test, y_pred)
+    }
+print(knn_eval)
+
+Neur
+from sklearn.neural_network import MLPClassifier
+df = pd.read_csv("data/breast_cancer.csv", na_values=['-', ' ', ''])
+
+display(df.head())
+df.info()
+X = df.drop(columns='isBenign')
+y = df['isBenign']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+scaler=StandardScaler()
+X_train=scaler.fit_transform(X_train)
+X_test=scaler.transform(X_test)
+mlp1=MLPClassifier(hidden_layer_sizes=(64,32), max_iter=1000, random_state=42, solver='sgd')
+mlp1.fit(X_train, y_train)
+plt.figure()
+plt.plot(mlp1.loss_curve_)
+plt.xlabel("Iteracija")
+plt.ylabel("Loss")
+plt.grid()
+plt.show()
+y_pred=mlp1.predict(X_test)
+cm = confusion_matrix(y_test, y_pred)
+print(cm)
+knn_eval = {
+        'accuracy': accuracy_score(y_test, y_pred),
+        'precision': precision_score(y_test, y_pred),
+        'recall': recall_score(y_test, y_pred),
+        'f1': f1_score(y_test, y_pred)
+    }
+print(knn_eval)
